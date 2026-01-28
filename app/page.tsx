@@ -18,13 +18,19 @@ const USERS = [
   'Zac',
 ]
 
+// Fractional odds data model
+interface FractionalOdds {
+  numerator: number   // What you win
+  denominator: number // What you risk
+}
+
 // Wager data model
 interface Wager {
   id: string
   from: string
   to: string
   amount: number
-  odds: number // American odds (e.g. -110, +200)
+  odds: FractionalOdds
   description: string
   status: 'open' | 'resolved'
   result?: 'from' | 'to' | 'push'
@@ -94,9 +100,11 @@ function calculateUserExposure(wagers: Wager[], user: string): number {
     }, 0)
 }
 
-// Get cell data for wagers between two users (open wagers only)
-function getCellData(wagers: Wager[], user1: string, user2: string): { amount: number; count: number } {
-  const userWagers = getWagersBetweenUsers(wagers, user1, user2, true)
+// Get cell data for wagers from one user to another (directional, open wagers only)
+function getCellData(wagers: Wager[], fromUser: string, toUser: string): { amount: number; count: number } {
+  const userWagers = wagers.filter(
+    w => w.from === fromUser && w.to === toUser && w.status === 'open'
+  )
   const totalAmount = userWagers.reduce((sum, wager) => sum + wager.amount, 0)
   return { amount: totalAmount, count: userWagers.length }
 }
@@ -303,10 +311,10 @@ export default function Home() {
     odds !== 0 &&
     formDescription.trim() !== ''
 
-  // Get all wagers between selected users (including resolved for display)
+  // Get wagers from selectedUserA to selectedUserB (directional, including resolved)
   const selectedWagers =
     selectedUserA && selectedUserB
-      ? getWagersBetweenUsers(wagers, selectedUserA, selectedUserB, false)
+      ? wagers.filter(w => w.from === selectedUserA && w.to === selectedUserB)
       : []
 
   return (
@@ -422,7 +430,7 @@ export default function Home() {
           <div className="detail-panel" onClick={(e) => e.stopPropagation()}>
             <div className="panel-header">
               <h2>
-                {selectedUserA} &harr; {selectedUserB}
+                {selectedUserA} &rarr; {selectedUserB}
               </h2>
               <button className="close-button" onClick={handleCloseDetailPanel}>
                 &times;

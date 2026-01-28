@@ -156,6 +156,7 @@ th {
   font-size: 13px;
   text-align: left;
   padding-left: 16px;
+  text-transform: uppercase;
 }
 
 /* Row hover effect */
@@ -721,6 +722,25 @@ tbody tr:hover td.exposure-cell {
 .submit-button:disabled {
   background: #d1d5db;
   cursor: not-allowed;
+}
+
+/* Odds Custom Input */
+.odds-custom-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.odds-input {
+  width: 80px !important;
+  text-align: center;
+}
+
+.odds-separator {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
 }
 
 /* Leaderboard */
