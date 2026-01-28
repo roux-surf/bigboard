@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { User } from '@supabase/supabase-js'
 
 // Preset users in alphabetical order
 const USERS = [
@@ -18,6 +19,23 @@ const USERS = [
   'Trey',
   'Will',
   'Zac',
+]
+
+// Whitelisted emails for authentication
+const ALLOWED_EMAILS = [
+  'chas.plaisance@gmail.com',
+  'williams.clay2009@gmail.com',
+  'craigbrown.gatech@gmail.com',
+  'dadomanico@gmail.com',
+  'johnandersonmurray@hotmail.com',
+  'mattmills49@gmail.com',
+  'nkeith88@gmail.com',
+  'rjkerns11@gmail.com',
+  'seanwalkerarnold@gmail.com',
+  'tturner787@gmail.com',
+  'treyzepernick@gmail.com',
+  'wengland09@gmail.com',
+  'zkannan3@gmail.com',
 ]
 
 // Wager data model (matches Supabase schema)
@@ -114,13 +132,41 @@ function getExposureTier(exposure: number, maxExposure: number): number {
 }
 
 export default function Home() {
+  // Auth state
+  const [user, setUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authEmail, setAuthEmail] = useState('')
+  const [magicLinkSent, setMagicLinkSent] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+
   // Wagers state
   const [wagers, setWagers] = useState<Wager[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Fetch wagers from Supabase on mount
+  // Check auth and fetch wagers on mount
   useEffect(() => {
-    fetchWagers()
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setAuthLoading(false)
+      if (session?.user) {
+        fetchWagers()
+      } else {
+        setLoading(false)
+      }
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          fetchWagers()
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
   }, [])
 
   const fetchWagers = async () => {
@@ -140,6 +186,35 @@ export default function Home() {
   // Reset handler - refetch from database
   const handleReset = () => {
     fetchWagers()
+  }
+
+  // Magic link authentication
+  const handleSendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAuthError(null)
+
+    // Check if email is allowed
+    const emailLower = authEmail.toLowerCase().trim()
+    if (!ALLOWED_EMAILS.some(allowed => allowed.toLowerCase() === emailLower)) {
+      setAuthError('This email is not authorized to access the Big Board.')
+      return
+    }
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail,
+      options: { emailRedirectTo: window.location.origin }
+    })
+    if (error) {
+      setAuthError(error.message)
+    } else {
+      setMagicLinkSent(true)
+    }
+  }
+
+  // Sign out handler
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
   }
 
   // Detail panel state
@@ -350,7 +425,7 @@ export default function Home() {
       ? wagers.filter(w => w.from_user === selectedUserA && w.to_user === selectedUserB)
       : []
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         Loading...
@@ -360,9 +435,14 @@ export default function Home() {
 
   return (
     <div>
-      <nav className="top-nav">
+      <nav className={`top-nav ${!user ? 'blurred' : ''}`}>
         <span className="nav-brand">The Big Board</span>
         <div className="nav-actions">
+          {user && (
+            <button className="reset-button" onClick={handleSignOut}>
+              Sign Out
+            </button>
+          )}
           <button className="reset-button" onClick={handleReset}>
             Refresh
           </button>
@@ -372,7 +452,7 @@ export default function Home() {
         </div>
       </nav>
 
-      <main className="main-content">
+      <main className={`main-content ${!user ? 'blurred' : ''}`}>
         <div className="grid-container">
         <table>
           <thead>
@@ -678,6 +758,37 @@ export default function Home() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Overlay */}
+      {!user && (
+        <div className="auth-overlay">
+          <div className="auth-modal">
+            <h2>The Big Board</h2>
+            <p className="auth-subtitle">Sign in to access the wager board</p>
+            {magicLinkSent ? (
+              <div className="auth-success">
+                <p>Magic link sent!</p>
+                <p className="auth-hint">Check your email and click the link to sign in.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSendMagicLink} className="auth-form">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="auth-input"
+                  required
+                />
+                {authError && <p className="form-error">{authError}</p>}
+                <button type="submit" className="auth-button">
+                  Send Magic Link
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
