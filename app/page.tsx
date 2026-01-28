@@ -38,9 +38,11 @@ function generateId(): string {
 // Initial wagers (empty for fresh start)
 const INITIAL_WAGERS: Wager[] = []
 
-// Heatmap thresholds (dollar amounts)
-const HEATMAP_LOW_MAX = 100
-const HEATMAP_MEDIUM_MAX = 500
+// Heatmap threshold type
+interface HeatmapThresholds {
+  low: number
+  medium: number
+}
 
 // Get all wagers between two users (both directions) - only open wagers for grid
 function getWagersBetweenUsers(wagers: Wager[], user1: string, user2: string, openOnly: boolean = false): Wager[] {
@@ -58,11 +60,11 @@ function getCellAmount(wagers: Wager[], user1: string, user2: string): number {
   return userWagers.reduce((sum, wager) => sum + wager.amount, 0)
 }
 
-// Get heatmap class based on cell amount
-function getCellHeatmapClass(amount: number): string {
+// Get heatmap class based on cell amount and dynamic thresholds
+function getCellHeatmapClass(amount: number, thresholds: HeatmapThresholds): string {
   if (amount === 0) return ''
-  if (amount <= HEATMAP_LOW_MAX) return 'heat-low'
-  if (amount <= HEATMAP_MEDIUM_MAX) return 'heat-medium'
+  if (amount <= thresholds.low) return 'heat-low'
+  if (amount <= thresholds.medium) return 'heat-medium'
   return 'heat-high'
 }
 
@@ -163,6 +165,31 @@ export default function Home() {
       }))
       .sort((a, b) => b.returns - a.returns)
   }, [wagers])
+
+  // Calculate dynamic heatmap thresholds based on current wager distribution
+  const heatmapThresholds = useMemo((): HeatmapThresholds => {
+    const amounts: number[] = []
+    for (const rowUser of USERS) {
+      for (const colUser of USERS) {
+        if (rowUser !== colUser) {
+          const amount = getCellData(wagers, rowUser, colUser).amount
+          if (amount > 0) amounts.push(amount)
+        }
+      }
+    }
+
+    if (amounts.length === 0) return { low: 0, medium: 0 }
+
+    amounts.sort((a, b) => a - b)
+    const lowIndex = Math.floor(amounts.length / 3)
+    const medIndex = Math.floor((amounts.length * 2) / 3)
+
+    return {
+      low: amounts[lowIndex] || amounts[0],
+      medium: amounts[medIndex] || amounts[lowIndex] || amounts[0]
+    }
+  }, [wagers])
+
   const top3Users = new Set(
     userExposures
       .filter((u) => u.exposure > 0)
@@ -325,7 +352,7 @@ export default function Home() {
                 </td>
                 {USERS.map((colUser, colIndex) => {
                   const cellData = getCellData(wagers, rowUser, colUser)
-                  const heatmapClass = getCellHeatmapClass(cellData.amount)
+                  const heatmapClass = getCellHeatmapClass(cellData.amount, heatmapThresholds)
                   return (
                     <td
                       key={colUser}
@@ -366,15 +393,15 @@ export default function Home() {
       <div className="legend-container">
         <div className="legend-item">
           <div className="legend-swatch low"></div>
-          <span>Low ($1-100)</span>
+          <span>Low ($1-{heatmapThresholds.low || '?'})</span>
         </div>
         <div className="legend-item">
           <div className="legend-swatch medium"></div>
-          <span>Medium ($101-500)</span>
+          <span>Medium (${heatmapThresholds.low + 1 || '?'}-{heatmapThresholds.medium || '?'})</span>
         </div>
         <div className="legend-item">
           <div className="legend-swatch high"></div>
-          <span>High ($500+)</span>
+          <span>High (${heatmapThresholds.medium + 1 || '?'}+)</span>
         </div>
       </div>
 
