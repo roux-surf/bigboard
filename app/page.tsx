@@ -18,19 +18,13 @@ const USERS = [
   'Zac',
 ]
 
-// Fractional odds data model
-interface FractionalOdds {
-  numerator: number   // What you win
-  denominator: number // What you risk
-}
-
 // Wager data model
 interface Wager {
   id: string
   from: string
   to: string
   amount: number
-  odds: FractionalOdds
+  odds: number // Positive odds only (e.g., 300 for +300)
   description: string
   status: 'open' | 'resolved'
   result?: 'from' | 'to' | 'push'
@@ -41,19 +35,8 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9)
 }
 
-// Initial sample wagers
-const INITIAL_WAGERS: Wager[] = [
-  { id: generateId(), from: 'Will', to: 'John', amount: 100, odds: -110, description: 'Chiefs vs Eagles Super Bowl', status: 'open' },
-  { id: generateId(), from: 'John', to: 'Will', amount: 50, odds: +150, description: 'Lakers win Western Conference', status: 'open' },
-  { id: generateId(), from: 'Chas', to: 'Clay', amount: 200, odds: -200, description: 'Bitcoin above 50k by March', status: 'open' },
-  { id: generateId(), from: 'Craig', to: 'Daniel', amount: 75, odds: +120, description: 'Yankees make playoffs', status: 'open' },
-  { id: generateId(), from: 'Matt', to: 'Nick', amount: 150, odds: -110, description: 'UFC 300 main event goes to decision', status: 'open' },
-  { id: generateId(), from: 'Ryan', to: 'Sean', amount: 100, odds: +200, description: 'Tesla stock above 300 by EOY', status: 'open' },
-  { id: generateId(), from: 'Ted', to: 'Zac', amount: 250, odds: -150, description: 'Celtics win NBA Championship', status: 'open' },
-  { id: generateId(), from: 'Will', to: 'Chas', amount: 100, odds: +100, description: 'Next Marvel movie over 1B box office', status: 'open' },
-  { id: generateId(), from: 'John', to: 'Clay', amount: 80, odds: -110, description: 'Dodgers win World Series', status: 'resolved', result: 'from' },
-  { id: generateId(), from: 'Sean', to: 'Ted', amount: 120, odds: +180, description: 'Snow in Austin before December', status: 'resolved', result: 'to' },
-]
+// Initial wagers (empty for fresh start)
+const INITIAL_WAGERS: Wager[] = []
 
 // Heatmap thresholds (dollar amounts)
 const HEATMAP_LOW_MAX = 100
@@ -83,21 +66,12 @@ function getCellHeatmapClass(amount: number): string {
   return 'heat-high'
 }
 
-// Calculate odds multiplier for exposure
-function getOddsMultiplier(odds: number): number {
-  if (odds < 0) {
-    return 1.0 // Negative odds: risk amount to win less
-  }
-  return 1 + odds / 100 // Positive odds: potential winnings
-}
-
 // Calculate total exposure for a user (open wagers they placed)
+// Exposure = what they could lose = amount * (odds/100)
 function calculateUserExposure(wagers: Wager[], user: string): number {
   return wagers
     .filter((wager) => wager.from === user && wager.status === 'open')
-    .reduce((total, wager) => {
-      return total + wager.amount * getOddsMultiplier(wager.odds)
-    }, 0)
+    .reduce((total, wager) => total + wager.amount * (wager.odds / 100), 0)
 }
 
 // Get cell data for wagers from one user to another (directional, open wagers only)
@@ -109,29 +83,26 @@ function getCellData(wagers: Wager[], fromUser: string, toUser: string): { amoun
   return { amount: totalAmount, count: userWagers.length }
 }
 
-// Format odds for display
+// Format odds for display (positive odds only)
 function formatOdds(odds: number): string {
-  return odds > 0 ? `+${odds}` : `${odds}`
+  return `+${odds}`
 }
 
 // Calculate all-time returns for a user (from resolved wagers)
+// If "from" wins: from +amount, to -amount
+// If "to" wins: to +(amount * odds/100), from -(amount * odds/100)
 function calculateUserReturns(wagers: Wager[], user: string): number {
   return wagers
     .filter((w) => w.status === 'resolved' && (w.from === user || w.to === user))
     .reduce((total, wager) => {
       if (wager.result === 'push') return total
 
-      // Calculate what "from" user would win based on odds
-      const fromProfit = wager.odds < 0
-        ? wager.amount * (100 / Math.abs(wager.odds))
-        : wager.amount * (wager.odds / 100)
+      const toWinAmount = wager.amount * (wager.odds / 100)
 
       if (wager.from === user) {
-        // User placed the wager
-        return total + (wager.result === 'from' ? fromProfit : -wager.amount)
+        return total + (wager.result === 'from' ? wager.amount : -toWinAmount)
       } else {
-        // User was the counterparty
-        return total + (wager.result === 'to' ? wager.amount : -fromProfit)
+        return total + (wager.result === 'to' ? toWinAmount : -wager.amount)
       }
     }, 0)
 }
@@ -262,7 +233,7 @@ export default function Home() {
     // Filter out the "from" user from "to" users
     const validToUsers = formToUsers.filter((u) => u !== formFrom)
 
-    if (formFrom && validToUsers.length > 0 && amount > 0 && odds !== 0 && formDescription.trim()) {
+    if (formFrom && validToUsers.length > 0 && amount > 0 && odds > 0 && formDescription.trim()) {
       // Create one wager for each "to" user
       const newWagers: Wager[] = validToUsers.map((toUser) => ({
         id: generateId(),
@@ -308,7 +279,7 @@ export default function Home() {
     !isNaN(amount) &&
     amount > 0 &&
     !isNaN(odds) &&
-    odds !== 0 &&
+    odds > 0 &&
     formDescription.trim() !== ''
 
   // Get wagers from selectedUserA to selectedUserB (directional, including resolved)
@@ -597,12 +568,13 @@ export default function Home() {
                     />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Odds</label>
+                    <label className="form-label">Odds (+)</label>
                     <input
                       type="number"
+                      min="1"
                       value={formOdds}
                       onChange={(e) => setFormOdds(e.target.value)}
-                      placeholder="-110"
+                      placeholder="100"
                       className="form-input"
                     />
                   </div>
