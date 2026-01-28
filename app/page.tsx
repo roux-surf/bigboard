@@ -121,6 +121,40 @@ function calculateUserReturns(wagers: Wager[], user: string): number {
     }, 0)
 }
 
+// Calculate total amount wagered by a user (resolved wagers only)
+function calculateTotalWagered(wagers: Wager[], user: string): number {
+  return wagers
+    .filter((w) => w.status === 'resolved' && (w.from_user === user || w.to_user === user))
+    .reduce((total, wager) => {
+      if (wager.from_user === user) {
+        return total + wager.amount
+      } else {
+        return total + wager.amount * (wager.odds / 100)
+      }
+    }, 0)
+}
+
+// Calculate W-L-P record for a user
+function calculateUserRecord(wagers: Wager[], user: string): { wins: number; losses: number; pushes: number } {
+  const resolved = wagers.filter(
+    (w) => w.status === 'resolved' && (w.from_user === user || w.to_user === user)
+  )
+
+  let wins = 0, losses = 0, pushes = 0
+
+  for (const wager of resolved) {
+    if (wager.result === 'push') {
+      pushes++
+    } else if (wager.from_user === user) {
+      wager.result === 'from' ? wins++ : losses++
+    } else {
+      wager.result === 'to' ? wins++ : losses++
+    }
+  }
+
+  return { wins, losses, pushes }
+}
+
 // Get exposure tier for user header tinting (0-3)
 function getExposureTier(exposure: number, maxExposure: number): number {
   if (maxExposure === 0 || exposure === 0) return 0
@@ -264,6 +298,8 @@ export default function Home() {
       .map((user) => ({
         user,
         returns: calculateUserReturns(wagers, user),
+        totalWagered: calculateTotalWagered(wagers, user),
+        record: calculateUserRecord(wagers, user),
       }))
       .sort((a, b) => b.returns - a.returns)
   }, [wagers])
@@ -544,12 +580,25 @@ export default function Home() {
 
       {/* Leaderboard */}
       <div className="leaderboard">
-        <h2 className="leaderboard-title">All-Time Returns</h2>
+        <h2 className="leaderboard-title">Leaderboard</h2>
+        <div className="leaderboard-header">
+          <span className="leaderboard-rank"></span>
+          <span className="leaderboard-name">Player</span>
+          <span className="leaderboard-record">Record</span>
+          <span className="leaderboard-wagered">Wagered</span>
+          <span className="leaderboard-returns">Returns</span>
+        </div>
         <div className="leaderboard-list">
           {leaderboard.map((entry, index) => (
             <div key={entry.user} className="leaderboard-item">
               <span className="leaderboard-rank">#{index + 1}</span>
               <span className="leaderboard-name">{entry.user}</span>
+              <span className="leaderboard-record">
+                {entry.record.wins}-{entry.record.losses}-{entry.record.pushes}
+              </span>
+              <span className="leaderboard-wagered">
+                ${Math.round(entry.totalWagered)}
+              </span>
               <span className={`leaderboard-returns ${entry.returns >= 0 ? 'positive' : 'negative'}`}>
                 {entry.returns >= 0 ? '+' : ''}${Math.round(entry.returns)}
               </span>
