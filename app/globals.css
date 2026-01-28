@@ -182,6 +182,75 @@ body {
   margin: 0 auto;
 }
 
+/* Recent Activity Strip */
+.activity-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-secondary);
+  overflow-x: auto;
+}
+
+.activity-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.activity-items {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.activity-item {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  animation: fadeIn 0.3s ease;
+}
+
+.activity-item strong {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.activity-description {
+  font-style: italic;
+  color: var(--text-muted);
+  margin-left: 6px;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.activity-time {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.activity-empty {
+  font-size: 13px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
 /* Grid Container */
 .grid-container {
   overflow: auto;
@@ -283,14 +352,19 @@ th {
   font-weight: 600;
 }
 
+.column-header {
+  white-space: nowrap;
+}
+
 .header-cell {
   background: var(--bg-tertiary);
   font-weight: 600;
   color: var(--text-secondary);
   font-size: 13px;
   text-align: left;
-  padding-left: 16px;
+  padding-left: 8px;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* Row hover effect */
@@ -394,6 +468,75 @@ tbody tr:hover td.exposure-cell {
   right: 0;
   z-index: 1;
   border-left: 2px solid var(--exposure-border);
+}
+
+/* Row + Column Focus Mode */
+.column-header.clickable,
+.header-cell.clickable {
+  cursor: pointer;
+}
+
+.column-header.clickable:hover,
+.header-cell.clickable:hover {
+  background: var(--bg-hover);
+}
+
+/* Focused header (the user being focused) */
+.column-header.focused,
+.header-cell.focused {
+  background: var(--accent-blue) !important;
+  color: white;
+}
+
+/* Cells in the focused user's row or column */
+.cell-focused {
+  box-shadow: inset 0 0 0 2px var(--accent-blue);
+}
+
+/* Cells NOT in the focused row/column - slightly muted */
+.cell-unfocused {
+  opacity: 0.5;
+}
+
+/* Pinned User Feature */
+.header-name {
+  display: inline;
+}
+
+.pin-button {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.3;
+  transition: opacity 0.15s;
+  vertical-align: middle;
+}
+
+.pin-button:hover {
+  opacity: 0.7;
+}
+
+.pin-button.pinned {
+  opacity: 1;
+}
+
+/* Pinned header styling */
+.column-header.pinned,
+.header-cell.pinned {
+  background: var(--bg-hover) !important;
+  border-bottom: 2px solid var(--accent-blue);
+}
+
+.column-header.pinned {
+  border-right: 2px solid var(--accent-blue);
+  border-bottom: none;
+}
+
+/* Pinned row indicator */
+.pinned-row td {
+  border-bottom: 1px solid var(--accent-blue);
 }
 
 /* Heatmap Legend */

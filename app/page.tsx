@@ -48,12 +48,79 @@ interface Wager {
   description: string
   status: 'open' | 'resolved'
   result?: 'from' | 'to' | 'push' | null
+  created_at?: string
+  updated_at?: string
+}
+
+// Activity item for the Recent Activity feed
+interface ActivityItem {
+  id: string
+  type: 'created' | 'resolved'
+  user: string
+  opponent: string
+  result?: 'win' | 'loss' | 'push'
+  timestamp: string
+  description: string
 }
 
 // Heatmap threshold type
 interface HeatmapThresholds {
   low: number
   medium: number
+}
+
+// Format relative time (e.g., "5m ago", "2h ago", "3d ago")
+function formatRelativeTime(timestamp: string): string {
+  const now = new Date()
+  const then = new Date(timestamp)
+  const diffMs = now.getTime() - then.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return then.toLocaleDateString()
+}
+
+// Derive activity items from wagers (most recent first, limit 8)
+function deriveActivityItems(wagers: Wager[]): ActivityItem[] {
+  const activities: ActivityItem[] = []
+
+  for (const wager of wagers) {
+    // Add "created" activity for all wagers
+    if (wager.created_at) {
+      activities.push({
+        id: `${wager.id}-created`,
+        type: 'created',
+        user: wager.from_user,
+        opponent: wager.to_user,
+        timestamp: wager.created_at,
+        description: wager.description,
+      })
+    }
+
+    // Add "resolved" activity for resolved wagers
+    if (wager.status === 'resolved' && wager.result) {
+      const resultText = wager.result === 'push' ? 'push' : (wager.result === 'from' ? 'win' : 'loss')
+      activities.push({
+        id: `${wager.id}-resolved`,
+        type: 'resolved',
+        user: wager.from_user,
+        opponent: wager.to_user,
+        result: resultText as 'win' | 'loss' | 'push',
+        timestamp: wager.updated_at || wager.created_at || new Date().toISOString(),
+        description: wager.description,
+      })
+    }
+  }
+
+  // Sort by timestamp descending and limit to 8 items
+  return activities
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 8)
 }
 
 // Get all wagers between two users (both directions) - only open wagers for grid
@@ -176,6 +243,7 @@ export default function Home() {
   // Wagers state
   const [wagers, setWagers] = useState<Wager[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentActivityIndex, setCurrentActivityIndex] = useState(0)
 
   // Check auth and fetch wagers on mount
   useEffect(() => {
@@ -267,6 +335,12 @@ export default function Home() {
   const [selectedUserB, setSelectedUserB] = useState<string | null>(null)
   const [isDetailPanelOpen, setIsDetailPanelOpen] = useState(false)
 
+  // Focus mode: highlight a single user's row and column
+  const [focusedUser, setFocusedUser] = useState<string | null>(null)
+
+  // Pinned user: moves their row to top and column to left for easier tracking
+  const [pinnedUser, setPinnedUser] = useState<string | null>(null)
+
   // Resolve wager state
   const [resolvingWagerId, setResolvingWagerId] = useState<string | null>(null)
 
@@ -303,6 +377,23 @@ export default function Home() {
       }))
       .sort((a, b) => b.returns - a.returns)
   }, [wagers])
+
+  // Derive recent activity from wagers (creates, resolves)
+  const recentActivity = useMemo(() => deriveActivityItems(wagers), [wagers])
+
+  // Cycle through recent activity items every 4 seconds
+  useEffect(() => {
+    if (recentActivity.length <= 1) return
+    const interval = setInterval(() => {
+      setCurrentActivityIndex(prev => (prev + 1) % recentActivity.length)
+    }, 4000)
+    return () => clearInterval(interval)
+  }, [recentActivity.length])
+
+  // Reset activity index when data changes
+  useEffect(() => {
+    setCurrentActivityIndex(0)
+  }, [recentActivity])
 
   // Calculate dynamic heatmap thresholds based on current wager distribution
   const heatmapThresholds = useMemo((): HeatmapThresholds => {
@@ -349,6 +440,23 @@ export default function Home() {
     if (tier === 0) return ''
     return `exposure-tint-${tier}`
   }
+
+  // Focus mode handler: toggle row+column highlight for a user
+  const handleUserFocus = (user: string) => {
+    setFocusedUser(prev => prev === user ? null : user)
+  }
+
+  // Pin handler: toggle pinned user (moves their row/column to top/left)
+  const handlePinUser = (user: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent triggering focus mode
+    setPinnedUser(prev => prev === user ? null : user)
+  }
+
+  // Sorted users: pinned user first, then alphabetical
+  const sortedUsers = useMemo(() => {
+    if (!pinnedUser) return USERS
+    return [pinnedUser, ...USERS.filter(u => u !== pinnedUser)]
+  }, [pinnedUser])
 
   // Detail panel handlers
   const handleCellClick = (rowUser: string, colUser: string) => {
@@ -500,6 +608,28 @@ export default function Home() {
       </nav>
 
       <main className={`main-content ${!user ? 'blurred' : ''}`}>
+        {/* Recent Activity Strip */}
+        <div className="activity-strip">
+          <span className="activity-label">Recent:</span>
+          <div className="activity-items">
+            {recentActivity.length === 0 ? (
+              <span className="activity-empty">No recent activity</span>
+            ) : (
+              <span key={recentActivity[currentActivityIndex].id} className="activity-item">
+                <strong>{recentActivity[currentActivityIndex].user}</strong>
+                {recentActivity[currentActivityIndex].type === 'created' ? (
+                  <> created</>
+                ) : (
+                  <> resolved ({recentActivity[currentActivityIndex].result})</>
+                )}
+                {' vs '}<strong>{recentActivity[currentActivityIndex].opponent}</strong>
+                <span className="activity-description">"{recentActivity[currentActivityIndex].description}"</span>
+                <span className="activity-time">{formatRelativeTime(recentActivity[currentActivityIndex].timestamp)}</span>
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className="grid-container">
         <table>
           <thead>
@@ -508,39 +638,60 @@ export default function Home() {
                 <span className="direction-hint from">From ↓</span>
                 <span className="direction-hint to">To →</span>
               </th>
-              {USERS.map((user) => (
-                <th key={user}>{user}</th>
+              {sortedUsers.map((colUser) => (
+                <th
+                  key={colUser}
+                  className={`column-header clickable ${focusedUser === colUser ? 'focused' : ''} ${pinnedUser === colUser ? 'pinned' : ''}`}
+                  onClick={() => handleUserFocus(colUser)}
+                >
+                  {colUser}
+                </th>
               ))}
               <th className="exposure-header">Exposure</th>
             </tr>
           </thead>
           <tbody>
-            {USERS.map((rowUser, rowIndex) => (
-              <tr key={rowUser}>
+            {sortedUsers.map((rowUser) => (
+              <tr key={rowUser} className={pinnedUser === rowUser ? 'pinned-row' : ''}>
                 <td
-                  className={`header-cell ${getUserExposureTintClass(rowUser)}`}
+                  className={`header-cell clickable ${getUserExposureTintClass(rowUser)} ${focusedUser === rowUser ? 'focused' : ''} ${pinnedUser === rowUser ? 'pinned' : ''}`}
+                  onClick={() => handleUserFocus(rowUser)}
                 >
-                  {rowUser}
+                  <button
+                    className={`pin-button ${pinnedUser === rowUser ? 'pinned' : ''}`}
+                    onClick={(e) => handlePinUser(rowUser, e)}
+                    title={pinnedUser === rowUser ? 'Unpin user' : 'Pin user'}
+                  >
+                    📌
+                  </button>
+                  <span className="header-name">{rowUser}</span>
                   {getUserBadge(rowUser)}
                 </td>
-                {USERS.map((colUser, colIndex) => {
+                {sortedUsers.map((colUser) => {
                   const cellData = getCellData(wagers, rowUser, colUser)
                   const heatmapClass = getCellHeatmapClass(cellData.amount, heatmapThresholds)
+                  // Diagonal: same user (rowUser === colUser), not based on index
+                  const isDiagonal = rowUser === colUser
+                  // Focus mode: cell is highlighted if in focused user's row or column
+                  const isInFocusedRowOrCol = focusedUser && (rowUser === focusedUser || colUser === focusedUser)
+                  const focusClass = focusedUser
+                    ? (isInFocusedRowOrCol ? 'cell-focused' : 'cell-unfocused')
+                    : ''
                   return (
                     <td
                       key={colUser}
                       className={
-                        rowIndex === colIndex
-                          ? 'diagonal'
-                          : `wager-cell clickable ${heatmapClass}`
+                        isDiagonal
+                          ? `diagonal ${focusClass}`
+                          : `wager-cell clickable ${heatmapClass} ${focusClass}`
                       }
                       onClick={
-                        rowIndex !== colIndex
+                        !isDiagonal
                           ? () => handleCellClick(rowUser, colUser)
                           : undefined
                       }
                     >
-                      {rowIndex === colIndex ? (
+                      {isDiagonal ? (
                         '—'
                       ) : (
                         <div className="cell-content">
@@ -553,7 +704,7 @@ export default function Home() {
                     </td>
                   )
                 })}
-                <td className="exposure-cell">
+                <td className={`exposure-cell ${focusedUser ? (rowUser === focusedUser ? 'cell-focused' : 'cell-unfocused') : ''}`}>
                   ${Math.round(calculateUserExposure(wagers, rowUser))}
                 </td>
               </tr>
