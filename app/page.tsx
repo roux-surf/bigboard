@@ -26,6 +26,7 @@ const ALLOWED_EMAILS = [
   'chas.plaisance@gmail.com',
   'williams.clay2009@gmail.com',
   'craigbrown.gatech@gmail.com',
+  'creeves24@gmail.com',
   'dadomanico@gmail.com',
   'johnandersonmurray@hotmail.com',
   'mattmills49@gmail.com',
@@ -711,22 +712,6 @@ export default function Home() {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Heatmap Legend */}
-      <div className="legend-container">
-        <div className="legend-item">
-          <div className="legend-swatch low"></div>
-          <span>Low ($1-{heatmapThresholds.low || '?'})</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-swatch medium"></div>
-          <span>Medium (${heatmapThresholds.low + 1 || '?'}-{heatmapThresholds.medium || '?'})</span>
-        </div>
-        <div className="legend-item">
-          <div className="legend-swatch high"></div>
-          <span>High (${heatmapThresholds.medium + 1 || '?'}+)</span>
-        </div>
       </div>
 
       {/* Leaderboard */}
