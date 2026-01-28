@@ -15,6 +15,7 @@ const USERS = [
   'Ryan',
   'Sean',
   'Ted',
+  'Trey',
   'Will',
   'Zac',
 ]
