@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 
 // Preset users in alphabetical order
 const USERS = [
@@ -18,25 +19,17 @@ const USERS = [
   'Zac',
 ]
 
-// Wager data model
+// Wager data model (matches Supabase schema)
 interface Wager {
   id: string
-  from: string
-  to: string
+  from_user: string
+  to_user: string
   amount: number
   odds: number // Positive odds only (e.g., 300 for +300)
   description: string
   status: 'open' | 'resolved'
-  result?: 'from' | 'to' | 'push'
+  result?: 'from' | 'to' | 'push' | null
 }
-
-// Generate unique ID
-function generateId(): string {
-  return Math.random().toString(36).substring(2, 9)
-}
-
-// Initial wagers (empty for fresh start)
-const INITIAL_WAGERS: Wager[] = []
 
 // Heatmap threshold type
 interface HeatmapThresholds {
@@ -48,8 +41,8 @@ interface HeatmapThresholds {
 function getWagersBetweenUsers(wagers: Wager[], user1: string, user2: string, openOnly: boolean = false): Wager[] {
   return wagers.filter(
     (wager) =>
-      ((wager.from === user1 && wager.to === user2) ||
-      (wager.from === user2 && wager.to === user1)) &&
+      ((wager.from_user === user1 && wager.to_user === user2) ||
+      (wager.from_user === user2 && wager.to_user === user1)) &&
       (!openOnly || wager.status === 'open')
   )
 }
@@ -72,14 +65,14 @@ function getCellHeatmapClass(amount: number, thresholds: HeatmapThresholds): str
 // Exposure = what they could lose = amount * (odds/100)
 function calculateUserExposure(wagers: Wager[], user: string): number {
   return wagers
-    .filter((wager) => wager.from === user && wager.status === 'open')
+    .filter((wager) => wager.from_user === user && wager.status === 'open')
     .reduce((total, wager) => total + wager.amount * (wager.odds / 100), 0)
 }
 
 // Get cell data for wagers from one user to another (directional, open wagers only)
 function getCellData(wagers: Wager[], fromUser: string, toUser: string): { amount: number; count: number } {
   const userWagers = wagers.filter(
-    w => w.from === fromUser && w.to === toUser && w.status === 'open'
+    w => w.from_user === fromUser && w.to_user === toUser && w.status === 'open'
   )
   const totalAmount = userWagers.reduce((sum, wager) => sum + wager.amount, 0)
   return { amount: totalAmount, count: userWagers.length }
@@ -95,13 +88,13 @@ function formatOdds(odds: number): string {
 // If "to" wins: to +(amount * odds/100), from -(amount * odds/100)
 function calculateUserReturns(wagers: Wager[], user: string): number {
   return wagers
-    .filter((w) => w.status === 'resolved' && (w.from === user || w.to === user))
+    .filter((w) => w.status === 'resolved' && (w.from_user === user || w.to_user === user))
     .reduce((total, wager) => {
       if (wager.result === 'push') return total
 
       const toWinAmount = wager.amount * (wager.odds / 100)
 
-      if (wager.from === user) {
+      if (wager.from_user === user) {
         return total + (wager.result === 'from' ? wager.amount : -toWinAmount)
       } else {
         return total + (wager.result === 'to' ? toWinAmount : -wager.amount)
@@ -120,12 +113,32 @@ function getExposureTier(exposure: number, maxExposure: number): number {
 }
 
 export default function Home() {
-  // Wagers state (initialized with sample data)
-  const [wagers, setWagers] = useState<Wager[]>(INITIAL_WAGERS)
+  // Wagers state
+  const [wagers, setWagers] = useState<Wager[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Reset handler
+  // Fetch wagers from Supabase on mount
+  useEffect(() => {
+    fetchWagers()
+  }, [])
+
+  const fetchWagers = async () => {
+    const { data, error } = await supabase
+      .from('wagers')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching wagers:', error)
+    } else {
+      setWagers(data || [])
+    }
+    setLoading(false)
+  }
+
+  // Reset handler - refetch from database
   const handleReset = () => {
-    setWagers(INITIAL_WAGERS.map(w => ({ ...w, id: generateId() })))
+    fetchWagers()
   }
 
   // Detail panel state
@@ -143,6 +156,8 @@ export default function Home() {
   const [formAmount, setFormAmount] = useState('')
   const [formOdds, setFormOdds] = useState('')
   const [formDescription, setFormDescription] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Calculate all user exposures and rankings
   const userExposures = useMemo(() => {
@@ -244,6 +259,7 @@ export default function Home() {
     setFormAmount('')
     setFormOdds('')
     setFormDescription('')
+    setFormError(null)
   }
 
   const handleToUserToggle = (user: string) => {
@@ -252,8 +268,11 @@ export default function Home() {
     )
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormError(null)
+    setIsSubmitting(true)
+
     const amount = parseFloat(formAmount)
     const odds = parseInt(formOdds, 10)
 
@@ -262,17 +281,29 @@ export default function Home() {
 
     if (formFrom && validToUsers.length > 0 && amount > 0 && odds > 0 && formDescription.trim()) {
       // Create one wager for each "to" user
-      const newWagers: Wager[] = validToUsers.map((toUser) => ({
-        id: generateId(),
-        from: formFrom,
-        to: toUser,
+      const newWagers = validToUsers.map((toUser) => ({
+        from_user: formFrom,
+        to_user: toUser,
         amount,
         odds,
         description: formDescription.trim(),
         status: 'open',
       }))
-      setWagers([...wagers, ...newWagers])
-      handleCloseCreateModal()
+
+      const { error } = await supabase.from('wagers').insert(newWagers)
+
+      if (error) {
+        console.error('Error creating wagers:', error)
+        setFormError(error.message || 'Failed to create wager')
+        setIsSubmitting(false)
+      } else {
+        await fetchWagers() // Refresh from database
+        setIsSubmitting(false)
+        handleCloseCreateModal()
+      }
+    } else {
+      setFormError('Please fill in all fields')
+      setIsSubmitting(false)
     }
   }
 
@@ -285,14 +316,17 @@ export default function Home() {
     setResolvingWagerId(null)
   }
 
-  const handleResolveWager = (wagerId: string, result: 'from' | 'to' | 'push') => {
-    setWagers((prev) =>
-      prev.map((wager) =>
-        wager.id === wagerId
-          ? { ...wager, status: 'resolved' as const, result }
-          : wager
-      )
-    )
+  const handleResolveWager = async (wagerId: string, result: 'from' | 'to' | 'push') => {
+    const { error } = await supabase
+      .from('wagers')
+      .update({ status: 'resolved', result })
+      .eq('id', wagerId)
+
+    if (error) {
+      console.error('Error resolving wager:', error)
+    } else {
+      await fetchWagers() // Refresh from database
+    }
     setResolvingWagerId(null)
   }
 
@@ -312,8 +346,16 @@ export default function Home() {
   // Get wagers from selectedUserA to selectedUserB (directional, including resolved)
   const selectedWagers =
     selectedUserA && selectedUserB
-      ? wagers.filter(w => w.from === selectedUserA && w.to === selectedUserB)
+      ? wagers.filter(w => w.from_user === selectedUserA && w.to_user === selectedUserB)
       : []
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        Loading...
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -321,7 +363,7 @@ export default function Home() {
         <span className="nav-brand">The Big Board</span>
         <div className="nav-actions">
           <button className="reset-button" onClick={handleReset}>
-            Reset
+            Refresh
           </button>
           <button className="create-wager-button" onClick={handleOpenCreateModal}>
             + Create Wager
@@ -446,7 +488,7 @@ export default function Home() {
                     >
                       <div className="wager-header">
                         <span className="wager-direction">
-                          {wager.from} &rarr; {wager.to}
+                          {wager.from_user} &rarr; {wager.to_user}
                         </span>
                         <span className={`wager-status status-${wager.status}`}>
                           {wager.status === 'open' ? 'Open' : 'Resolved'}
@@ -457,8 +499,8 @@ export default function Home() {
                         <span>${wager.amount} at {formatOdds(wager.odds)}</span>
                         {wager.status === 'resolved' && wager.result && (
                           <span className="wager-result">
-                            {wager.result === 'from' && `${wager.from} won`}
-                            {wager.result === 'to' && `${wager.to} won`}
+                            {wager.result === 'from' && `${wager.from_user} won`}
+                            {wager.result === 'to' && `${wager.to_user} won`}
                             {wager.result === 'push' && 'Push'}
                           </span>
                         )}
@@ -481,13 +523,13 @@ export default function Home() {
                               className="resolve-option from-wins"
                               onClick={() => handleResolveWager(wager.id, 'from')}
                             >
-                              {wager.from} wins
+                              {wager.from_user} wins
                             </button>
                             <button
                               className="resolve-option to-wins"
                               onClick={() => handleResolveWager(wager.id, 'to')}
                             >
-                              {wager.to} wins
+                              {wager.to_user} wins
                             </button>
                             <button
                               className="resolve-option push"
@@ -613,6 +655,10 @@ export default function Home() {
                   </p>
                 )}
 
+                {formError && (
+                  <p className="form-error">{formError}</p>
+                )}
+
                 <div className="form-actions">
                   <button
                     type="button"
@@ -624,9 +670,9 @@ export default function Home() {
                   <button
                     type="submit"
                     className="submit-button"
-                    disabled={!isFormValid}
+                    disabled={!isFormValid || isSubmitting}
                   >
-                    Create {validToUsers.length > 1 ? `${validToUsers.length} Wagers` : 'Wager'}
+                    {isSubmitting ? 'Creating...' : `Create ${validToUsers.length > 1 ? `${validToUsers.length} Wagers` : 'Wager'}`}
                   </button>
                 </div>
               </form>
