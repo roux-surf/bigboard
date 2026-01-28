@@ -145,6 +145,17 @@ export default function Home() {
 
   // Check auth and fetch wagers on mount
   useEffect(() => {
+    // Bypass auth on localhost for development
+    const isLocalhost = typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+
+    if (isLocalhost) {
+      setUser({ id: 'dev-user', email: 'dev@localhost' } as User)
+      setAuthLoading(false)
+      fetchWagers()
+      return
+    }
+
     // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
@@ -457,7 +468,10 @@ export default function Home() {
         <table>
           <thead>
             <tr>
-              <th></th>
+              <th className="corner-label">
+                <span className="direction-hint from">From ↓</span>
+                <span className="direction-hint to">To →</span>
+              </th>
               {USERS.map((user) => (
                 <th key={user}>{user}</th>
               ))}
