@@ -677,13 +677,19 @@ export default function Home() {
               <span className="activity-empty">No recent activity</span>
             ) : (
               <span key={recentActivity[currentActivityIndex].id} className="activity-item">
-                <strong>{recentActivity[currentActivityIndex].user}</strong>
                 {recentActivity[currentActivityIndex].type === 'created' ? (
-                  <> created</>
+                  <>
+                    <span className="activity-badge new">New</span>
+                    {' '}<strong>{recentActivity[currentActivityIndex].user}</strong>
+                    {' vs '}<strong>{recentActivity[currentActivityIndex].opponent}</strong>
+                  </>
                 ) : (
-                  <> resolved ({recentActivity[currentActivityIndex].result})</>
+                  <>
+                    <span className={`activity-badge ${recentActivity[currentActivityIndex].result}`}>{recentActivity[currentActivityIndex].result === 'push' ? 'Push' : 'Settled'}</span>
+                    {' '}<strong>{recentActivity[currentActivityIndex].user}</strong>
+                    {' vs '}<strong>{recentActivity[currentActivityIndex].opponent}</strong>
+                  </>
                 )}
-                {' vs '}<strong>{recentActivity[currentActivityIndex].opponent}</strong>
                 <span className="activity-description">"{recentActivity[currentActivityIndex].description}"</span>
                 <span className="activity-time">{formatRelativeTime(recentActivity[currentActivityIndex].timestamp)}</span>
               </span>

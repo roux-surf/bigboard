@@ -260,6 +260,33 @@ button, a, .clickable, .checkbox-item, input, select, textarea {
   color: var(--text-faint);
 }
 
+.activity-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.activity-badge.new {
+  background: var(--status-open-bg);
+  color: var(--status-open-text);
+}
+
+.activity-badge.win,
+.activity-badge.loss {
+  background: var(--status-resolved-bg);
+  color: var(--status-resolved-text);
+}
+
+.activity-badge.push {
+  background: var(--status-resolved-bg);
+  color: var(--status-resolved-text);
+}
+
 .activity-empty {
   font-size: 13px;
   color: var(--text-faint);
