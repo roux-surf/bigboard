@@ -262,7 +262,7 @@ export default function Home() {
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
 
     if (isLocalhost) {
-      setUser({ id: 'dev-user', email: 'dev@localhost' } as User)
+      setUser({ id: 'dev-user', email: 'wengland09@gmail.com' } as User)
       setAuthLoading(false)
       fetchWagers()
       return
