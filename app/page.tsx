@@ -257,9 +257,13 @@ export default function Home() {
 
   // Check auth and fetch wagers on mount
   useEffect(() => {
-    // Bypass auth on localhost for development
-    const isLocalhost = typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    // Bypass auth on localhost / LAN IPs for development
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const isLocalhost = hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
 
     if (isLocalhost) {
       setUser({ id: 'dev-user', email: 'wengland09@gmail.com' } as User)
@@ -649,14 +653,17 @@ export default function Home() {
         <div className="nav-actions">
           {user && (
             <button className="reset-button" onClick={handleSignOut}>
-              Sign Out
+              <span className="btn-icon" aria-hidden="true">&#x2715;</span>
+              <span className="btn-label">Sign Out</span>
             </button>
           )}
           <button className="reset-button" onClick={handleReset}>
-            Refresh
+            <span className="btn-icon" aria-hidden="true">&#x21BB;</span>
+            <span className="btn-label">Refresh</span>
           </button>
           <button className="create-wager-button" onClick={handleOpenCreateModal}>
-            + Create Wager
+            <span className="btn-label-full">+ Create Wager</span>
+            <span className="btn-label-short">+ New</span>
           </button>
         </div>
       </nav>
@@ -698,7 +705,7 @@ export default function Home() {
                   className={`column-header clickable ${focusedUser === colUser ? 'focused' : ''} ${pinnedUser === colUser ? 'pinned' : ''}`}
                   onClick={() => handleUserFocus(colUser)}
                 >
-                  {colUser}
+                  <span className="column-header-text">{colUser}</span>
                 </th>
               ))}
               <th className="exposure-header">Exposure</th>

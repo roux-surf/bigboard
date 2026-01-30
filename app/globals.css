@@ -111,6 +111,21 @@ body {
   background: var(--bg-primary);
   color: var(--text-primary);
   line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Touch UX: prevent 300ms tap delay, prevent double-tap zoom */
+button, a, .clickable, .checkbox-item, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* Button label visibility helpers (default: show full labels, hide short labels) */
+.btn-icon {
+  display: none;
+}
+
+.btn-label-short {
+  display: none;
 }
 
 /* Top Navigation Bar */
@@ -260,6 +275,7 @@ body {
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   border: 1px solid var(--border-primary);
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -1162,37 +1178,69 @@ tbody tr:hover td.exposure-cell {
   text-align: right;
 }
 
-/* Mobile Responsive Styles */
+/* =============================================
+   Mobile Responsive Styles
+   ============================================= */
+
+/* --- Tablet breakpoint (768px) --- */
 @media (max-width: 768px) {
+  /* Compact Navigation */
   .top-nav {
-    padding: 14px 16px;
-    flex-direction: column;
-    gap: 12px;
+    padding: 10px 12px;
+    flex-direction: row;
+    gap: 8px;
   }
 
   .nav-brand {
-    font-size: 18px;
+    font-size: 16px;
+    flex-shrink: 0;
   }
 
   .nav-actions {
-    width: 100%;
+    gap: 6px;
+    justify-content: flex-end;
   }
 
   .create-wager-button,
   .reset-button {
-    flex: 1;
-    text-align: center;
+    padding: 8px 10px;
+    font-size: 13px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
   }
 
   .main-content {
-    padding: 16px;
+    padding: 12px;
   }
 
-  /* Smaller grid cells on mobile */
+  /* Grid table: narrower cells with rotated headers */
   th, td {
-    padding: 8px 10px;
-    min-width: 65px;
+    padding: 6px 4px;
+    min-width: 38px;
     font-size: 12px;
+  }
+
+  /* Rotate column headers vertically */
+  thead th.column-header {
+    height: 72px;
+    min-width: 32px;
+    max-width: 32px;
+    width: 32px;
+    padding: 4px 2px 6px;
+    vertical-align: bottom;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .column-header-text {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    display: inline-block;
+    white-space: nowrap;
+    font-size: 11px;
   }
 
   .cell-amount {
@@ -1201,6 +1249,24 @@ tbody tr:hover td.exposure-cell {
 
   .cell-count {
     font-size: 10px;
+  }
+
+  /* Ensure minimum 44px touch target height for rows */
+  tbody td {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  /* Grid scroll shadow hints */
+  .grid-container {
+    background:
+      linear-gradient(to right, var(--bg-secondary) 30%, transparent) left center,
+      linear-gradient(to left, var(--bg-secondary) 30%, transparent) right center,
+      radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.12), transparent) left center,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.12), transparent) right center;
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
   }
 
   /* Full-screen panels on mobile */
@@ -1228,25 +1294,165 @@ tbody tr:hover td.exposure-cell {
   .checkbox-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-}
 
-@media (max-width: 480px) {
-  th, td {
-    padding: 6px 8px;
-    min-width: 55px;
-    font-size: 11px;
+  /* Form inputs: 16px prevents iOS zoom-on-focus */
+  .form-select,
+  .form-input,
+  .form-textarea {
+    font-size: 16px;
   }
 
-  .cell-amount {
+  /* Activity strip: reduce size */
+  .activity-strip {
+    padding: 8px 12px;
+    margin-bottom: 12px;
+  }
+
+  .activity-item {
     font-size: 12px;
   }
 
+  .activity-description {
+    max-width: 180px;
+  }
+
+  /* Leaderboard: tighter spacing */
+  .leaderboard {
+    padding: 16px;
+    margin-top: 16px;
+  }
+
+  .leaderboard-item {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .leaderboard-rank {
+    width: 28px;
+    font-size: 12px;
+  }
+
+  .leaderboard-name {
+    font-size: 13px;
+  }
+
+  .leaderboard-record,
+  .leaderboard-wagered,
+  .leaderboard-returns {
+    font-size: 12px;
+  }
+}
+
+/* --- Small phone breakpoint (480px) --- */
+@media (max-width: 480px) {
+  /* Navigation: show icons, hide text labels */
+  .btn-label {
+    display: none;
+  }
+
+  .btn-icon {
+    display: inline;
+    font-size: 16px;
+  }
+
+  .btn-label-full {
+    display: none;
+  }
+
+  .btn-label-short {
+    display: inline;
+  }
+
+  .create-wager-button,
+  .reset-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Smaller grid cells */
+  th, td {
+    padding: 4px 3px;
+    min-width: 32px;
+    font-size: 11px;
+  }
+
+  thead th.column-header {
+    min-width: 28px;
+    max-width: 28px;
+    width: 28px;
+  }
+
+  .column-header-text {
+    font-size: 10px;
+  }
+
+  .cell-amount {
+    font-size: 11px;
+  }
+
+  /* Hide wager count on small screens — show only dollar amount */
   .cell-count {
-    font-size: 9px;
+    display: none;
   }
 
   .header-cell {
-    padding-left: 10px;
+    padding-left: 4px;
+    font-size: 10px;
+  }
+
+  .corner-label {
+    min-width: 36px;
+  }
+
+  /* Pin button smaller on mobile */
+  .pin-button {
+    font-size: 10px;
+    padding: 1px 2px;
+  }
+
+  /* Hide "Wagered" column on narrow screens */
+  .leaderboard-wagered {
+    display: none;
+  }
+
+  .leaderboard-header .leaderboard-wagered {
+    display: none;
+  }
+
+  /* Activity strip: more aggressive truncation */
+  .activity-description {
+    max-width: 120px;
+  }
+
+  .activity-item {
+    font-size: 11px;
+  }
+
+  .activity-label {
+    font-size: 11px;
+  }
+}
+
+/* --- Very narrow screens (360px) --- */
+@media (max-width: 360px) {
+  .checkbox-grid {
+    grid-template-columns: 1fr;
+  }
+
+  th, td {
+    min-width: 28px;
+    padding: 3px 2px;
+  }
+
+  thead th.column-header {
+    min-width: 24px;
+    max-width: 24px;
+    width: 24px;
+    height: 64px;
+  }
+
+  .column-header-text {
+    font-size: 9px;
   }
 }
 
