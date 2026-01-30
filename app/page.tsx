@@ -345,6 +345,9 @@ export default function Home() {
   // Resolve wager state
   const [resolvingWagerId, setResolvingWagerId] = useState<string | null>(null)
 
+  // Edit wager state
+  const [editingWager, setEditingWager] = useState<Wager | null>(null)
+
   // Create wager modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [formFrom, setFormFrom] = useState('')
@@ -354,6 +357,7 @@ export default function Home() {
   const [formDescription, setFormDescription] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [toastMessage, setToastMessage] = useState<string | null>(null)
 
   // Calculate all user exposures and rankings
   const userExposures = useMemo(() => {
@@ -486,12 +490,24 @@ export default function Home() {
 
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false)
+    setEditingWager(null)
     setFormFrom('')
     setFormToUsers([])
     setFormAmount('')
     setFormOdds('')
     setFormDescription('')
     setFormError(null)
+  }
+
+  const handleEditWager = (wager: Wager) => {
+    setEditingWager(wager)
+    setFormFrom(wager.from_user)
+    setFormToUsers([wager.to_user])
+    setFormDescription(wager.description)
+    setFormAmount(String(wager.amount))
+    setFormOdds(String(wager.odds))
+    setFormError(null)
+    setIsCreateModalOpen(true)
   }
 
   const handleToUserToggle = (user: string) => {
@@ -512,26 +528,53 @@ export default function Home() {
     const validToUsers = formToUsers.filter((u) => u !== formFrom)
 
     if (formFrom && validToUsers.length > 0 && amount > 0 && odds > 0 && formDescription.trim()) {
-      // Create one wager for each "to" user
-      const newWagers = validToUsers.map((toUser) => ({
-        from_user: formFrom,
-        to_user: toUser,
-        amount,
-        odds,
-        description: formDescription.trim(),
-        status: 'open',
-      }))
+      if (editingWager) {
+        // Update existing wager
+        const { error } = await supabase
+          .from('wagers')
+          .update({
+            description: formDescription.trim(),
+            amount,
+            odds,
+          })
+          .eq('id', editingWager.id)
 
-      const { error } = await supabase.from('wagers').insert(newWagers)
-
-      if (error) {
-        console.error('Error creating wagers:', error)
-        setFormError(error.message || 'Failed to create wager')
-        setIsSubmitting(false)
+        if (error) {
+          console.error('Error updating wager:', error)
+          setFormError(error.message || 'Failed to update wager')
+          setIsSubmitting(false)
+        } else {
+          await fetchWagers()
+          setToastMessage('Wager updated successfully!')
+          setTimeout(() => setToastMessage(null), 3000)
+          setIsSubmitting(false)
+          handleCloseCreateModal()
+        }
       } else {
-        await fetchWagers() // Refresh from database
-        setIsSubmitting(false)
-        handleCloseCreateModal()
+        // Create one wager for each "to" user
+        const newWagers = validToUsers.map((toUser) => ({
+          from_user: formFrom,
+          to_user: toUser,
+          amount,
+          odds,
+          description: formDescription.trim(),
+          status: 'open',
+        }))
+
+        const { error } = await supabase.from('wagers').insert(newWagers)
+
+        if (error) {
+          console.error('Error creating wagers:', error)
+          setFormError(error.message || 'Failed to create wager')
+          setIsSubmitting(false)
+        } else {
+          await fetchWagers()
+          const count = validToUsers.length
+          setToastMessage(`Wager${count > 1 ? 's' : ''} created successfully!`)
+          setTimeout(() => setToastMessage(null), 3000)
+          setIsSubmitting(false)
+          handleCloseCreateModal()
+        }
       }
     } else {
       setFormError('Please fill in all fields')
@@ -787,12 +830,20 @@ export default function Home() {
                       </div>
 
                       {wager.status === 'open' && resolvingWagerId !== wager.id && (
-                        <button
-                          className="resolve-button"
-                          onClick={() => handleStartResolve(wager.id)}
-                        >
-                          Resolve
-                        </button>
+                        <div className="wager-actions">
+                          <button
+                            className="edit-button"
+                            onClick={() => handleEditWager(wager)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="resolve-button"
+                            onClick={() => handleStartResolve(wager.id)}
+                          >
+                            Resolve
+                          </button>
+                        </div>
                       )}
 
                       {resolvingWagerId === wager.id && (
@@ -840,91 +891,115 @@ export default function Home() {
         <div className="panel-overlay" onClick={handleCloseCreateModal}>
           <div className="detail-panel create-modal" onClick={(e) => e.stopPropagation()}>
             <div className="panel-header">
-              <h2>Create New Wager</h2>
+              <h2>{editingWager ? 'Edit Wager' : 'Create New Wager'}</h2>
               <button className="close-button" onClick={handleCloseCreateModal}>
                 &times;
               </button>
             </div>
             <div className="panel-content">
               <form className="wager-form" onSubmit={handleSubmit}>
-                <div className="form-group">
-                  <label className="form-label">From</label>
-                  <select
-                    value={formFrom}
-                    onChange={(e) => setFormFrom(e.target.value)}
-                    className="form-select"
-                  >
-                    <option value="">Select person...</option>
-                    {USERS.map((user) => (
-                      <option key={user} value={user}>
-                        {user}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    To (select one or more opponents)
-                  </label>
-                  <div className="checkbox-grid">
-                    {USERS.map((user) => (
-                      <label
-                        key={user}
-                        className={`checkbox-item ${
-                          user === formFrom ? 'disabled' : ''
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={formToUsers.includes(user)}
-                          onChange={() => handleToUserToggle(user)}
-                          disabled={user === formFrom}
-                        />
-                        <span>{user}</span>
-                      </label>
-                    ))}
+                {editingWager ? (
+                  <div className="form-group">
+                    <label className="form-label">Participants</label>
+                    <p className="form-readonly">{editingWager.from_user} &rarr; {editingWager.to_user}</p>
                   </div>
-                  {formToUsers.length > 0 && (
-                    <p className="selected-count">
-                      {validToUsers.length} opponent
-                      {validToUsers.length !== 1 ? 's' : ''} selected
-                    </p>
-                  )}
-                </div>
+                ) : (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">From</label>
+                      <select
+                        value={formFrom}
+                        onChange={(e) => { setFormFrom(e.target.value); setFormToUsers([]); }}
+                        className="form-select"
+                      >
+                        <option value="">Select person...</option>
+                        {USERS.map((user) => (
+                          <option key={user} value={user}>
+                            {user}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">
+                        To (select one or more opponents)
+                      </label>
+                      {!formFrom && (
+                        <p className="form-hint">Select a "From" person first</p>
+                      )}
+                      <div className={`checkbox-grid ${!formFrom ? 'disabled-grid' : ''}`}>
+                        {USERS.map((user) => (
+                          <label
+                            key={user}
+                            className={`checkbox-item ${
+                              !formFrom || user === formFrom ? 'disabled' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formToUsers.includes(user)}
+                              onChange={() => handleToUserToggle(user)}
+                              disabled={!formFrom || user === formFrom}
+                            />
+                            <span>{user}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {formToUsers.length > 0 && (
+                        <p className="selected-count">
+                          {validToUsers.length} opponent
+                          {validToUsers.length !== 1 ? 's' : ''} selected
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 <div className="form-group">
                   <label className="form-label">Description *</label>
+                  {validToUsers.length === 0 && (
+                    <p className="form-hint">Select opponent(s) first</p>
+                  )}
                   <textarea
                     value={formDescription}
                     onChange={(e) => setFormDescription(e.target.value)}
                     placeholder="What is the wager about?"
-                    className="form-textarea"
+                    className={`form-textarea${validToUsers.length === 0 ? ' disabled-field' : ''}`}
                     rows={2}
+                    disabled={validToUsers.length === 0}
                   />
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Amount ($)</label>
+                    {!formDescription.trim() && (
+                      <p className="form-hint">Enter a description first</p>
+                    )}
                     <input
                       type="number"
                       min="1"
                       value={formAmount}
                       onChange={(e) => setFormAmount(e.target.value)}
                       placeholder="100"
-                      className="form-input"
+                      className={`form-input${!formDescription.trim() ? ' disabled-field' : ''}`}
+                      disabled={!formDescription.trim()}
                     />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Odds (+)</label>
+                    {!formDescription.trim() && (
+                      <p className="form-hint">Enter a description first</p>
+                    )}
                     <input
                       type="number"
                       min="1"
                       value={formOdds}
                       onChange={(e) => setFormOdds(e.target.value)}
                       placeholder="100"
-                      className="form-input"
+                      className={`form-input${!formDescription.trim() ? ' disabled-field' : ''}`}
+                      disabled={!formDescription.trim()}
                     />
                   </div>
                 </div>
@@ -952,13 +1027,21 @@ export default function Home() {
                     className="submit-button"
                     disabled={!isFormValid || isSubmitting}
                   >
-                    {isSubmitting ? 'Creating...' : `Create ${validToUsers.length > 1 ? `${validToUsers.length} Wagers` : 'Wager'}`}
+                    {editingWager
+                      ? (isSubmitting ? 'Saving...' : 'Save Changes')
+                      : (isSubmitting ? 'Creating...' : `Create ${validToUsers.length > 1 ? `${validToUsers.length} Wagers` : 'Wager'}`)
+                    }
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="toast">{toastMessage}</div>
       )}
 
       {/* Auth Overlay */}

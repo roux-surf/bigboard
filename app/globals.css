@@ -539,45 +539,6 @@ tbody tr:hover td.exposure-cell {
   border-bottom: 1px solid var(--accent-blue);
 }
 
-/* Heatmap Legend */
-.legend-container {
-  display: flex;
-  justify-content: center;
-  gap: 24px;
-  padding: 16px 24px;
-  margin-top: 16px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  border: 1px solid var(--border-primary);
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.legend-swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.legend-swatch.low {
-  background: var(--heat-low);
-}
-
-.legend-swatch.medium {
-  background: var(--heat-medium);
-}
-
-.legend-swatch.high {
-  background: var(--heat-high);
-}
-
 /* Panel/Modal Styles */
 .panel-overlay {
   position: fixed;
@@ -748,9 +709,34 @@ tbody tr:hover td.exposure-cell {
   font-style: italic;
 }
 
+/* Wager Action Buttons */
+.wager-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.edit-button {
+  padding: 8px 14px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  flex: 1;
+  transition: all 0.15s ease;
+}
+
+.edit-button:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
 /* Resolve Button */
 .resolve-button {
-  margin-top: 12px;
   padding: 8px 14px;
   background: var(--accent-blue);
   color: white;
@@ -759,12 +745,23 @@ tbody tr:hover td.exposure-cell {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  width: 100%;
+  flex: 1;
   transition: all 0.15s ease;
 }
 
 .resolve-button:hover {
   background: var(--accent-blue-dark);
+}
+
+/* Read-only field display (edit mode) */
+.form-readonly {
+  padding: 10px 14px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
 /* Resolve Panel */
@@ -900,6 +897,25 @@ tbody tr:hover td.exposure-cell {
 
 .form-row .form-group {
   flex: 1;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-style: italic;
+}
+
+.disabled-grid {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.form-select:disabled,
+.form-input:disabled,
+.form-textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Multi-select checkbox grid */
@@ -1097,6 +1113,31 @@ tbody tr:hover td.exposure-cell {
   margin-bottom: 8px;
 }
 
+/* Header column alignment - must match data columns */
+.leaderboard-header .leaderboard-rank {
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.leaderboard-header .leaderboard-name {
+  flex: 1;
+}
+
+.leaderboard-header .leaderboard-record {
+  flex: 1;
+  text-align: center;
+}
+
+.leaderboard-header .leaderboard-wagered {
+  flex: 1;
+  text-align: right;
+}
+
+.leaderboard-header .leaderboard-returns {
+  flex: 1;
+  text-align: right;
+}
+
 .leaderboard-record {
   font-size: 13px;
   font-weight: 500;
@@ -1179,11 +1220,6 @@ tbody tr:hover td.exposure-cell {
   .checkbox-grid {
     grid-template-columns: repeat(2, 1fr);
   }
-
-  .legend-container {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
 }
 
 @media (max-width: 480px) {
@@ -1204,6 +1240,33 @@ tbody tr:hover td.exposure-cell {
   .header-cell {
     padding-left: 10px;
   }
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #16a34a;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 300;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: toast-in 0.3s ease, toast-out 0.3s ease 2.7s forwards;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; transform: translateX(-50%) translateY(12px); }
 }
 
 /* Auth Overlay & Blur */
