@@ -21,22 +21,27 @@ const USERS = [
   'Zac',
 ]
 
+// Email to display name mapping
+const EMAIL_TO_NAME: Record<string, string> = {
+  'chas.plaisance@gmail.com': 'Chas',
+  'williams.clay2009@gmail.com': 'Clay',
+  'craigbrown.gatech@gmail.com': 'Craig',
+  'dadomanico@gmail.com': 'Daniel',
+  'johnandersonmurray@hotmail.com': 'John',
+  'mattmills49@gmail.com': 'Matt',
+  'nkeith88@gmail.com': 'Nick',
+  'rjkerns11@gmail.com': 'Ryan',
+  'seanwalkerarnold@gmail.com': 'Sean',
+  'tturner787@gmail.com': 'Ted',
+  'treyzepernick@gmail.com': 'Trey',
+  'wengland09@gmail.com': 'Will',
+  'zkannan3@gmail.com': 'Zac',
+}
+
 // Whitelisted emails for authentication
 const ALLOWED_EMAILS = [
-  'chas.plaisance@gmail.com',
-  'williams.clay2009@gmail.com',
-  'craigbrown.gatech@gmail.com',
+  ...Object.keys(EMAIL_TO_NAME),
   'creeves24@gmail.com',
-  'dadomanico@gmail.com',
-  'johnandersonmurray@hotmail.com',
-  'mattmills49@gmail.com',
-  'nkeith88@gmail.com',
-  'rjkerns11@gmail.com',
-  'seanwalkerarnold@gmail.com',
-  'tturner787@gmail.com',
-  'treyzepernick@gmail.com',
-  'wengland09@gmail.com',
-  'zkannan3@gmail.com',
 ]
 
 // Wager data model (matches Supabase schema)
@@ -49,6 +54,7 @@ interface Wager {
   description: string
   status: 'open' | 'resolved'
   result?: 'from' | 'to' | 'push' | null
+  created_by?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -240,6 +246,9 @@ export default function Home() {
   const [authEmail, setAuthEmail] = useState('')
   const [magicLinkSent, setMagicLinkSent] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+
+  // Derive current user's display name from auth email
+  const currentUserName = user?.email ? EMAIL_TO_NAME[user.email.toLowerCase()] || null : null
 
   // Wagers state
   const [wagers, setWagers] = useState<Wager[]>([])
@@ -559,6 +568,7 @@ export default function Home() {
           odds,
           description: formDescription.trim(),
           status: 'open',
+          created_by: currentUserName,
         }))
 
         const { error } = await supabase.from('wagers').insert(newWagers)
@@ -826,6 +836,12 @@ export default function Home() {
                             {wager.result === 'to' && `${wager.to_user} won`}
                             {wager.result === 'push' && 'Push'}
                           </span>
+                        )}
+                      </div>
+                      <div className="wager-meta">
+                        {wager.created_by && <span>Created by {wager.created_by}</span>}
+                        {wager.created_at && (
+                          <span>{new Date(wager.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                         )}
                       </div>
 

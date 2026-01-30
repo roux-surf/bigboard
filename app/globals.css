@@ -709,6 +709,14 @@ tbody tr:hover td.exposure-cell {
   font-style: italic;
 }
 
+.wager-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
 /* Wager Action Buttons */
 .wager-actions {
   display: flex;
